@@ -1,6 +1,6 @@
 // Import necessary dependencies from React and other libraries.
 import React, { useState, useEffect } from 'react';
-import { MoreVertical, Droplets, Clock, AlertCircle, Plus, Minus } from 'lucide-react';
+import { MoreVertical, Droplets, Clock, AlertCircle, Plus, Minus, AlertTriangle } from 'lucide-react';
 
 // Import utility functions, including one for conditional class naming.
 import { cn } from '../lib/utils';
