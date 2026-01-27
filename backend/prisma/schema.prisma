@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  settings      Json     @default("{\"ema_alpha\": 0.35, \"snooze_factor\": 0.2}")
+  rooms         Room[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  name      String
+  sortOrder Int      @default(0)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  plants    Plant[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlantArchetype {
+  id              Int     @id @default(autoincrement())
+  name            String
+  defaultInterval Int
+  plants          Plant[]
+}
+
+model Plant {
+  id               String         @id @default(uuid())
+  name             String
+  imageUrl         String?
+  roomId           String
+  room             Room           @relation(fields: [roomId], references: [id])
+  archetypeId      Int
+  archetype        PlantArchetype @relation(fields: [archetypeId], references: [id])
+  lastWateredDate  DateTime?
+  nextCheckDate    DateTime       @default(now())
+  currentEma       Float
+  events           Event[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+enum EventType {
+  WATER
+  SNOOZE
+  REPOT
+  NOTE
+}
+
+enum SoilCondition {
+  NORMAL
+  DRY
+}
+
+model Event {
+  id              String    @id @default(uuid())
+  plantId         String
+  plant           Plant     @relation(fields: [plantId], references: [id])
+  timestamp       DateTime  @default(now())
+  type            EventType
+  isAnomaly       Boolean   @default(false)
+  note            String?
+  snoozeExtraDays Int?
+  soilCondition   SoilCondition?
+}

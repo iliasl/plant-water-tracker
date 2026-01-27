@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: planttracker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d planttracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - plant-network
+
+  backend:
+    build: ./backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/planttracker?schema=public
+      PORT: 3001
+    ports:
+      - "8289:3001"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - plant-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8288:80"
+    depends_on:
+      - backend
+    networks:
+      - plant-network
+
+networks:
+  plant-network:
+    driver: bridge
+
+volumes:
+  pgdata:
