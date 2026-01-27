@@ -47,6 +47,7 @@ model Plant {
   nextCheckDate    DateTime       @default(now())
   currentEma       Float
   events           Event[]
+  waterAmount      Float?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 }

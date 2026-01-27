@@ -166,7 +166,7 @@ app.get('/api/plants/:id', async (req, res) => {
 });
 
 app.post('/api/plants', async (req, res) => {
-  const { name, roomId, archetypeId, imageUrl } = req.body;
+  const { name, roomId, archetypeId, imageUrl, waterAmount } = req.body;
   const archetype = await prisma.plantArchetype.findUnique({ where: { id: archetypeId } });
   
   const plant = await prisma.plant.create({
@@ -175,6 +175,7 @@ app.post('/api/plants', async (req, res) => {
       roomId,
       archetypeId,
       imageUrl,
+      waterAmount: waterAmount ? parseFloat(waterAmount) : null,
       currentEma: archetype.defaultInterval,
       nextCheckDate: new Date()
     }
@@ -183,12 +184,13 @@ app.post('/api/plants', async (req, res) => {
 });
 
 app.patch('/api/plants/:id', async (req, res) => {
-  const { name, roomId, archetypeId, imageUrl, currentEma } = req.body;
+  const { name, roomId, archetypeId, imageUrl, currentEma, waterAmount } = req.body;
   const data = {};
   if (name !== undefined) data.name = name;
   if (roomId !== undefined) data.roomId = roomId;
   if (archetypeId !== undefined) data.archetypeId = archetypeId;
   if (imageUrl !== undefined) data.imageUrl = imageUrl;
+  if (waterAmount !== undefined) data.waterAmount = waterAmount ? parseFloat(waterAmount) : null;
   
   if (currentEma !== undefined) {
     data.currentEma = parseFloat(currentEma);

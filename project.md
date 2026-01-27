@@ -22,7 +22,7 @@ The system uses an **Irregular Exponential Moving Average (EMA)** to predict the
 ## 3. Database Schema Highlights
 - **User**: Stores algorithm weights (`alpha`, `snooze_factor`).
 - **Room**: Logical grouping. Includes a protected "Graveyard" room for soft-deleted plants.
-- **Plant**: Stores `currentEma`, `lastWateredDate`, `nextCheckDate`, and `imageUrl`.
+- **Plant**: Stores `currentEma`, `lastWateredDate`, `nextCheckDate`, `imageUrl`, and `waterAmount`.
 - **PlantArchetype**: Seed data for initial intervals (Fern, Succulent, etc.).
 - **Event**: History log. Fields: `type` (WATER, SNOOZE, REPOT, etc.), `isAnomaly`, `soilCondition`, `snoozeExtraDays`.
 
@@ -30,12 +30,13 @@ The system uses an **Irregular Exponential Moving Average (EMA)** to predict the
 - **Triage Dashboard (`App.jsx`)**:
     - **To Water**: Grouped by Room. Plants due today or overdue.
     - **Upcoming**: Flat list sorted by time. Future check-ins.
-- **Plant Card**: Large vertically centered photos, quick-action buttons (Water/Snooze), and high-level stats.
+- **Plant Card**: Large vertically centered photos, quick-action buttons (Water/Snooze), and high-level stats including the required water amount.
 - **Details View (`PlantDetails.jsx`)**:
     - Header with photo, name, room, and archetype.
     - Stats grid: Current learned schedule and days since last watered.
     - **Interactive Chart**: Intervals over time vs. current EMA dotted line.
     - **Event Log**: Historical list with delete capability for corrections.
+    - The ability to edit the plant's details, including the water amount, via the `PlantModal`.
 - **Settings**: Algorithm tuning (sliders), room management (delete empty/move plants to Default), and access to the Plant Graveyard.
 
 ## 5. Deployment Context

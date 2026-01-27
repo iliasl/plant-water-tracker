@@ -5,6 +5,7 @@ A self-correcting plant care assistant that learns from your watering habits.
 ## Features
 - **Smart Triage Dashboard**: Sorted by urgency.
 - **Adaptive Prediction Engine**: Uses Irregular EMA to learn watering intervals.
+- **Water Amount Tracking**: Specify the amount of water for each plant.
 - **Smart Snooze**: Automatically delays checks for wet plants.
 - **Anomaly Handling**: Ignores user forgetfulness in calculations.
 - **Mobile-First UI**: One-handed operation design.

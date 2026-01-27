@@ -7,10 +7,16 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
   const [imageUrl, setImageUrl] = useState(plant?.imageUrl || '');
   const [roomId, setRoomId] = useState(plant?.roomId || rooms[0]?.id || '');
   const [archetypeId, setArchetypeId] = useState(plant?.archetypeId || archetypes[0]?.id || '');
+  const [waterAmount, setWaterAmount] = useState(plant?.waterAmount || '');
   const [newRoomName, setNewRoomName] = useState('');
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  const waterAmountOptions = [];
+  for (let i = 0.25; i <= 3; i += 0.25) {
+    waterAmountOptions.push(i.toFixed(2));
+  }
 
   // Sync state if props load after mounting
   useEffect(() => {
@@ -65,7 +71,8 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
         name, 
         roomId: finalRoomId, 
         archetypeId: parseInt(archetypeId), 
-        imageUrl 
+        imageUrl,
+        waterAmount: waterAmount ? parseFloat(waterAmount) : null
       };
 
       if (isNaN(payload.archetypeId)) {
@@ -196,6 +203,20 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
                 {archetypes.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Water Amount (Liters)</label>
+            <select
+              value={waterAmount}
+              onChange={e => setWaterAmount(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2"
+            >
+              <option value="">N/A</option>
+              {waterAmountOptions.map(amount => (
+                <option key={amount} value={amount}>{amount}</option>
+              ))}
+            </select>
           </div>
 
           <div>

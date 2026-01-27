@@ -1,28 +1,53 @@
+// Import necessary dependencies from React and other libraries.
 import React, { useState, useEffect } from 'react';
 import { MoreVertical, Droplets, Clock, AlertCircle, Plus, Minus } from 'lucide-react';
+
+// Import utility functions, including one for conditional class naming.
 import { cn } from '../lib/utils';
 import { formatDistanceToNow, isPast, parseISO, isToday } from 'date-fns';
 
+
+/**
+ * PlantCard component displays a summary of a plant's status and provides actions.
+ * @param {object} plant - The plant object with details like name, watering schedule, etc.
+ * @param {function} onAction - Callback function to handle actions like watering or snoozing.
+ * @param {function} onEdit - Callback function to handle editing the plant's details.
+ * @param {function} onView - Callback function to view the plant's details.
+ */
 const PlantCard = ({ plant, onAction, onEdit, onView }) => {
+  // Parse the next check date for the plant.
   const nextDate = plant.nextCheckDate ? parseISO(plant.nextCheckDate) : null;
+  // Determine if the plant's watering is overdue.
   const isOverdue = nextDate && !isNaN(nextDate) && isPast(nextDate) && !isToday(nextDate);
+  // Determine if the plant needs to be watered today.
   const isCurrentlyToday = nextDate && !isNaN(nextDate) && isToday(nextDate);
+  // State to track if an action is being handled.
   const [isHandling, setIsHandling] = useState(false);
+  // State to control the visibility of the snooze popup.
   const [showSnoozePopup, setShowSnoozePopup] = useState(false);
+  // State to control the visibility of the water popup.
   const [showWaterPopup, setShowWaterPopup] = useState(false);
+  // State to manage the number of days to snooze.
   const [snoozeDays, setSnoozeDays] = useState(2);
 
-  // Default snooze calculation
+  // This effect calculates the default snooze duration based on the plant's current EMA (Exponential Moving Average).
+  // It ensures the snooze period is a fraction of the watering cycle, with a minimum of 2 days.
   useEffect(() => {
     if (plant.currentEma) {
       setSnoozeDays(Math.max(2, Math.floor(plant.currentEma * 0.2)));
     }
   }, [plant.currentEma]);
 
+  // Format the last watered date into a human-readable string.
   const lastWateredStr = plant.lastWateredDate 
     ? `${formatDistanceToNow(new Date(plant.lastWateredDate))} ago`
     : 'Never';
 
+  /**
+   * Handles actions like 'WATER' or 'SNOOZE' for the plant.
+   * @param {string} type - The type of action to perform.
+   * @param {object} extraData - Additional data for the action, like snooze days or soil condition.
+   */
   const handleAction = async (type, extraData = {}) => {
     setIsHandling(true);
     setShowSnoozePopup(false);
@@ -31,6 +56,7 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
   };
 
   return (
+    // Main container for the plant card, with a click handler to view plant details.
     <div 
       onClick={() => onView(plant)}
       className={cn(
@@ -38,6 +64,7 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
         isHandling && "grayscale-[0.5] scale-[0.98]"
       )}
     >
+      {/* Snooze popup, shown when the user wants to delay the next watering. */}
       {showSnoozePopup && (
         <div 
           onClick={(e) => e.stopPropagation()}
@@ -76,6 +103,7 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
         </div>
       )}
 
+      {/* Water popup, shown when the user clicks the water button. */}
       {showWaterPopup && (
         <div 
           onClick={(e) => e.stopPropagation()}
@@ -105,6 +133,7 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
         </div>
       )}
 
+      {/* Main content of the plant card. */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className={cn(
@@ -122,11 +151,13 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
             <h3 className="font-semibold text-slate-800 truncate">{plant.name}</h3>
             <p className="text-xs text-slate-500 flex items-center gap-1">
               <Clock className="w-3 h-3" />
+              {/* Display whether the plant is overdue or when the next check is due. */}
               {isOverdue ? 'Overdue' : 'Due'} {nextDate && !isNaN(nextDate) ? formatDistanceToNow(nextDate, { addSuffix: true }) : 'N/A'}
             </p>
           </div>
         </div>
 
+        {/* Action buttons for snoozing and watering. */}
         <div className="flex gap-2">
           <button 
             disabled={isHandling}
@@ -153,14 +184,19 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-50">
+      {/* Footer section with last watered date and watering schedule. */}
+      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-50">
         <div className="text-center border-r">
           <p className="text-[10px] uppercase font-bold text-slate-400">Last Watered</p>
           <p className="text-xs font-semibold text-slate-700">{lastWateredStr}</p>
         </div>
-        <div className="text-center">
+        <div className="text-center border-r">
           <p className="text-[10px] uppercase font-bold text-slate-400">Schedule</p>
           <p className="text-xs font-semibold text-slate-700">Every {Math.round(plant.currentEma)} days</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] uppercase font-bold text-slate-400">Water Amount</p>
+          <p className="text-xs font-semibold text-slate-700">{plant.waterAmount ? `${plant.waterAmount}L` : 'N/A'}</p>
         </div>
       </div>
     </div>
