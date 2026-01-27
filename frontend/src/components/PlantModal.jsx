@@ -113,12 +113,6 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
     }
   };
 
-  const handleAnomalyWater = async () => {
-    await axios.post(`/api/plants/${plant.id}/event`, { type: 'WATER', isAnomaly: true });
-    onSave();
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
       <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-xl animate-in slide-in-from-bottom duration-300">
@@ -265,20 +259,13 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
             </button>
             
             {plant && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-1 gap-2 mt-2">
                 <button 
                   type="button"
                   onClick={handleRepot}
                   className="flex items-center justify-center gap-2 border border-slate-200 text-slate-600 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50"
                 >
                   <RotateCcw className="w-4 h-4" /> Repotted
-                </button>
-                <button 
-                  type="button"
-                  onClick={handleAnomalyWater}
-                  className="flex items-center justify-center gap-2 border border-slate-200 text-slate-600 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50"
-                >
-                  <AlertTriangle className="w-4 h-4" /> Forgot
                 </button>
               </div>
             )}

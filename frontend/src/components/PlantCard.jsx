@@ -123,6 +123,13 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
             >
               <AlertCircle className="w-4 h-4" /> Too Dry (-20% time)
             </button>
+            <button
+              onClick={() => handleAction('WATER', { isAnomaly: true })}
+              className="w-full py-3 bg-yellow-50 text-yellow-700 rounded-xl font-bold border border-yellow-200 flex items-center justify-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4" /> Forgot to log
+            </button>
+            <p className="text-xs text-slate-500 text-center -mt-2">Use this if you missed a log. The schedule won't be updated.</p>
             <button 
               onClick={() => setShowWaterPopup(false)}
               className="w-full py-2 text-slate-400 text-sm font-medium"
