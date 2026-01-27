@@ -68,130 +68,128 @@ async function main() {
     where: { name: 'Aroid' },
   });
 
-  // Create plants
-  const plant1 = await prisma.plant.create({
-    data: {
+  const demoPlants = [
+    {
       name: 'Boston Fern',
       imageUrl: 'https://images.unsplash.com/photo-1597092953338-c38f4a4c42fe?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: { connect: { id: livingRoom.id } },
-      archetype: { connect: { id: fernArchetype.id } },
-      currentEma: fernArchetype.defaultInterval,
+      room: livingRoom,
+      archetype: fernArchetype,
       waterAmount: 0.5,
+      wateringInterval: 5,
     },
-  });
-
-  const plant2 = await prisma.plant.create({
-    data: {
+    {
       name: 'Bird of Paradise',
       imageUrl: 'https://images.unsplash.com/photo-1628042774315-9f5b211d0f3c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: { connect: { id: livingRoom.id } },
-      archetype: { connect: { id: tropicalArchetype.id } },
-      currentEma: tropicalArchetype.defaultInterval,
+      room: livingRoom,
+      archetype: tropicalArchetype,
       waterAmount: 1.0,
+      wateringInterval: 10,
     },
-  });
-
-  const plant3 = await prisma.plant.create({
-    data: {
+    {
       name: 'Monstera Deliciosa',
       imageUrl: 'https://images.unsplash.com/photo-1614526344510-14f828a1e2a5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: { connect: { id: livingRoom.id } },
-      archetype: { connect: { id: aroidArchetype.id } },
-      currentEma: aroidArchetype.defaultInterval,
+      room: livingRoom,
+      archetype: aroidArchetype,
       waterAmount: 0.75,
+      wateringInterval: 7,
     },
-  });
-
-  const plant4 = await prisma.plant.create({
-    data: {
+    {
       name: 'Maidenhair Fern',
       imageUrl: 'https://images.unsplash.com/photo-1557989936-39a473434b95?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: { connect: { id: bedroom.id } },
-      archetype: { connect: { id: fernArchetype.id } },
-      currentEma: fernArchetype.defaultInterval,
+      room: bedroom,
+      archetype: fernArchetype,
       waterAmount: 0.25,
+      wateringInterval: 6,
     },
+  ];
+
+  for (const plantData of demoPlants) {
+    const plantExists = await prisma.plant.findFirst({ where: { name: plantData.name } });
+    if (!plantExists) {
+      const newPlant = await prisma.plant.create({
+        data: {
+          name: plantData.name,
+          imageUrl: plantData.imageUrl,
+          room: { connect: { id: plantData.room.id } },
+          archetype: { connect: { id: plantData.archetype.id } },
+          currentEma: plantData.archetype.defaultInterval,
+          waterAmount: plantData.waterAmount,
+        },
+      });
+
+      // Create watering events
+      let currentDate = new Date();
+      currentDate.setMonth(currentDate.getMonth() - 3);
+      const history = [];
+      while (currentDate < new Date()) {
+        history.push({
+          plantId: newPlant.id,
+          timestamp: new Date(currentDate),
+          type: 'WATER',
+        });
+        currentDate.setDate(currentDate.getDate() + plantData.wateringInterval + Math.floor(Math.random() * 3) - 1); // Add some randomness
+      }
+      await prisma.event.createMany({
+        data: history,
+      });
+
+      // Recalculate plant state
+      await recalculatePlantState(newPlant.id);
+    }
+  }
+
+  console.log('Seed data checked and created if necessary.');
+}
+
+async function recalculatePlantState(plantId) {
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    include: { room: { include: { user: true } }, events: { orderBy: { timestamp: 'asc' } }, archetype: true }
   });
 
-  // Create watering events
-  const createWateringHistory = async (plantId, interval, months) => {
-    let currentDate = new Date();
-    currentDate.setMonth(currentDate.getMonth() - months);
-    const history = [];
-    while (currentDate < new Date()) {
-      history.push({
-        plantId: plantId,
-        timestamp: new Date(currentDate),
-        type: 'WATER',
-      });
-      currentDate.setDate(currentDate.getDate() + interval + Math.floor(Math.random() * 3) -1); // Add some randomness
-    }
-    await prisma.event.createMany({
-      data: history,
-    });
-  };
+  if (!plant) return;
 
-  await createWateringHistory(plant1.id, 5, 3); // Fern every 5 days for 3 months
-  await createWateringHistory(plant2.id, 10, 3); // Bird of Paradise every 10 days for 3 months
-  await createWateringHistory(plant3.id, 7, 3); // Monstera every 7 days for 3 months
-  await createWateringHistory(plant4.id, 6, 3); // Fern every 6 days for 3 months
+  const settings = plant.room.user?.settings || { ema_alpha: 0.35, snooze_factor: 0.2 };
+  const events = plant.events;
 
-  // Recalculate plant states
-  const recalculatePlantState = async (plantId) => {
-    const plant = await prisma.plant.findUnique({
-      where: { id: plantId },
-      include: { room: { include: { user: true } }, events: { orderBy: { timestamp: 'asc' } }, archetype: true }
-    });
+  let currentEma = plant.archetype.defaultInterval;
+  let lastWateredDate = null;
+  let nextCheckDate = new Date(plant.createdAt);
 
-    const settings = plant.room.user?.settings || { ema_alpha: 0.35, snooze_factor: 0.2 };
-    const events = plant.events;
+  for (const event of events) {
+    const eventTime = new Date(event.timestamp);
 
-    let currentEma = plant.archetype.defaultInterval;
-    let lastWateredDate = null;
-    let nextCheckDate = new Date(plant.createdAt);
-
-    for (const event of events) {
-      const eventTime = new Date(event.timestamp);
-
-      if (event.type === 'WATER') {
-        if (!event.isAnomaly && lastWateredDate) {
-          const observedInterval = (eventTime - lastWateredDate) / (1000 * 60 * 60 * 24);
-          currentEma = (settings.ema_alpha * observedInterval) + ((1 - settings.ema_alpha) * currentEma);
-        }
-        lastWateredDate = eventTime;
-
-        let interval = currentEma;
-        if (event.soilCondition === 'DRY') {
-          interval = interval * 0.8;
-        }
-        nextCheckDate = new Date(eventTime.getTime() + interval * 24 * 60 * 60 * 1000);
-      } else if (event.type === 'SNOOZE') {
-        const snoozeDays = event.snoozeExtraDays || Math.max(2, Math.floor(currentEma * settings.snooze_factor));
-        nextCheckDate = new Date(eventTime.getTime() + snoozeDays * 24 * 60 * 60 * 1000);
-      } else if (event.type === 'REPOT') {
-        currentEma = plant.archetype.defaultInterval;
-        nextCheckDate = eventTime;
+    if (event.type === 'WATER') {
+      if (!event.isAnomaly && lastWateredDate) {
+        const observedInterval = (eventTime - lastWateredDate) / (1000 * 60 * 60 * 24);
+        currentEma = (settings.ema_alpha * observedInterval) + ((1 - settings.ema_alpha) * currentEma);
       }
+      lastWateredDate = eventTime;
+
+      let interval = currentEma;
+      if (event.soilCondition === 'DRY') {
+        interval = interval * 0.8;
+      }
+      nextCheckDate = new Date(eventTime.getTime() + interval * 24 * 60 * 60 * 1000);
+    } else if (event.type === 'SNOOZE') {
+      const snoozeDays = event.snoozeExtraDays || Math.max(2, Math.floor(currentEma * settings.snooze_factor));
+      nextCheckDate = new Date(eventTime.getTime() + snoozeDays * 24 * 60 * 60 * 1000);
+    } else if (event.type === 'REPOT') {
+      currentEma = plant.archetype.defaultInterval;
+      nextCheckDate = eventTime;
     }
+  }
 
-    if (events.length === 0) {
-      nextCheckDate = new Date();
-    }
+  if (events.length === 0) {
+    nextCheckDate = new Date();
+  }
 
-    return prisma.plant.update({
-      where: { id: plantId },
-      data: { currentEma, lastWateredDate, nextCheckDate }
-    });
-  };
+  return prisma.plant.update({
+    where: { id: plantId },
+    data: { currentEma, lastWateredDate, nextCheckDate }
+  });
+};
 
-  await recalculatePlantState(plant1.id);
-  await recalculatePlantState(plant2.id);
-  await recalculatePlantState(plant3.id);
-  await recalculatePlantState(plant4.id);
-
-
-  console.log('Seed data created successfully');
-}
 
 main()
   .catch((e) => {
