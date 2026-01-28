@@ -68,73 +68,77 @@ async function main() {
     where: { name: 'Aroid' },
   });
 
-  const demoPlants = [
-    {
-      name: 'Boston Fern',
-      imageUrl: 'https://images.unsplash.com/photo-1597092953338-c38f4a4c42fe?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: livingRoom,
-      archetype: fernArchetype,
-      waterAmount: 0.5,
-      wateringInterval: 5,
-    },
-    {
-      name: 'Bird of Paradise',
-      imageUrl: 'https://images.unsplash.com/photo-1628042774315-9f5b211d0f3c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: livingRoom,
-      archetype: tropicalArchetype,
-      waterAmount: 1.0,
-      wateringInterval: 10,
-    },
-    {
-      name: 'Monstera Deliciosa',
-      imageUrl: 'https://images.unsplash.com/photo-1614526344510-14f828a1e2a5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: livingRoom,
-      archetype: aroidArchetype,
-      waterAmount: 0.75,
-      wateringInterval: 7,
-    },
-    {
-      name: 'Maidenhair Fern',
-      imageUrl: 'https://images.unsplash.com/photo-1557989936-39a473434b95?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
-      room: bedroom,
-      archetype: fernArchetype,
-      waterAmount: 0.25,
-      wateringInterval: 6,
-    },
-  ];
+  const seedDemoPlants = process.argv.includes('--demo');
 
-  for (const plantData of demoPlants) {
-    const plantExists = await prisma.plant.findFirst({ where: { name: plantData.name } });
-    if (!plantExists) {
-      const newPlant = await prisma.plant.create({
-        data: {
-          name: plantData.name,
-          imageUrl: plantData.imageUrl,
-          room: { connect: { id: plantData.room.id } },
-          archetype: { connect: { id: plantData.archetype.id } },
-          currentEma: plantData.archetype.defaultInterval,
-          waterAmount: plantData.waterAmount,
-        },
-      });
+  if (seedDemoPlants) {
+    const demoPlants = [
+      {
+        name: 'Boston Fern',
+        imageUrl: 'https://images.unsplash.com/photo-1597092953338-c38f4a4c42fe?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
+        room: livingRoom,
+        archetype: fernArchetype,
+        waterAmount: 0.5,
+        wateringInterval: 5,
+      },
+      {
+        name: 'Bird of Paradise',
+        imageUrl: 'https://images.unsplash.com/photo-1628042774315-9f5b211d0f3c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
+        room: livingRoom,
+        archetype: tropicalArchetype,
+        waterAmount: 1.0,
+        wateringInterval: 10,
+      },
+      {
+        name: 'Monstera Deliciosa',
+        imageUrl: 'https://images.unsplash.com/photo-1614526344510-14f828a1e2a5?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
+        room: livingRoom,
+        archetype: aroidArchetype,
+        waterAmount: 0.75,
+        wateringInterval: 7,
+      },
+      {
+        name: 'Maidenhair Fern',
+        imageUrl: 'https://images.unsplash.com/photo-1557989936-39a473434b95?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&q=80',
+        room: bedroom,
+        archetype: fernArchetype,
+        waterAmount: 0.25,
+        wateringInterval: 6,
+      },
+    ];
 
-      // Create watering events
-      let currentDate = new Date();
-      currentDate.setMonth(currentDate.getMonth() - 3);
-      const history = [];
-      while (currentDate < new Date()) {
-        history.push({
-          plantId: newPlant.id,
-          timestamp: new Date(currentDate),
-          type: 'WATER',
+    for (const plantData of demoPlants) {
+      const plantExists = await prisma.plant.findFirst({ where: { name: plantData.name } });
+      if (!plantExists) {
+        const newPlant = await prisma.plant.create({
+          data: {
+            name: plantData.name,
+            imageUrl: plantData.imageUrl,
+            room: { connect: { id: plantData.room.id } },
+            archetype: { connect: { id: plantData.archetype.id } },
+            currentEma: plantData.archetype.defaultInterval,
+            waterAmount: plantData.waterAmount,
+          },
         });
-        currentDate.setDate(currentDate.getDate() + plantData.wateringInterval + Math.floor(Math.random() * 3) - 1); // Add some randomness
-      }
-      await prisma.event.createMany({
-        data: history,
-      });
 
-      // Recalculate plant state
-      await recalculatePlantState(newPlant.id);
+        // Create watering events
+        let currentDate = new Date();
+        currentDate.setMonth(currentDate.getMonth() - 3);
+        const history = [];
+        while (currentDate < new Date()) {
+          history.push({
+            plantId: newPlant.id,
+            timestamp: new Date(currentDate),
+            type: 'WATER',
+          });
+          currentDate.setDate(currentDate.getDate() + plantData.wateringInterval + Math.floor(Math.random() * 3) - 1); // Add some randomness
+        }
+        await prisma.event.createMany({
+          data: history,
+        });
+
+        // Recalculate plant state
+        await recalculatePlantState(newPlant.id);
+      }
     }
   }
 

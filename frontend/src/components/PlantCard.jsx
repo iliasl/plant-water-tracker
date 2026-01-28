@@ -110,29 +110,33 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5/6 bg-white z-20 rounded-xl p-4 flex flex-col justify-center items-center animate-in fade-in zoom-in duration-200 cursor-default shadow-2xl border"
         >
           <p className="text-sm font-bold text-slate-700 mb-4 text-center">How was the soil before watering?</p>
-          <div className="flex flex-col gap-2 w-full">
-            <button 
-              onClick={() => handleAction('WATER', { soilCondition: 'NORMAL' })}
-              className="w-full py-2 bg-green-50 text-green-700 rounded-lg font-bold border border-green-200 flex items-center justify-center gap-2 text-sm"
-            >
-              <Droplets className="w-4 h-4" /> Normal
-            </button>
-            <button 
-              onClick={() => handleAction('WATER', { soilCondition: 'DRY' })}
-              className="w-full py-2 bg-orange-50 text-orange-700 rounded-lg font-bold border border-orange-200 flex items-center justify-center gap-2 text-sm"
-            >
-              <AlertCircle className="w-4 h-4" /> Too Dry (-20% time)
-            </button>
-            <button
-              onClick={() => handleAction('WATER', { isAnomaly: true })}
-              className="w-full py-2 bg-yellow-50 text-yellow-700 rounded-lg font-bold border border-yellow-200 flex items-center justify-center gap-2 text-sm"
-            >
-              <AlertTriangle className="w-4 h-4" /> Forgot to log
-            </button>
-            <p className="text-xs text-slate-500 text-center">Schedule won't be updated.</p>
+          <div className="flex flex-col gap-3 w-full">
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                onClick={() => handleAction('WATER', { soilCondition: 'NORMAL' })}
+                className="w-full py-2 bg-green-50 text-green-700 rounded-lg font-bold border border-green-200 flex items-center justify-center gap-2 text-sm"
+              >
+                <Droplets className="w-4 h-4" /> Normal
+              </button>
+              <button 
+                onClick={() => handleAction('WATER', { soilCondition: 'DRY' })}
+                className="w-full py-2 bg-orange-50 text-orange-700 rounded-lg font-bold border border-orange-200 flex items-center justify-center gap-2 text-sm"
+              >
+                <AlertCircle className="w-4 h-4" /> Too Dry
+              </button>
+            </div>
+            <div className="text-center">
+              <button
+                onClick={() => handleAction('WATER', { isAnomaly: true })}
+                className="w-full py-2 bg-yellow-50 text-yellow-700 rounded-lg font-bold border border-yellow-200 flex items-center justify-center gap-2 text-sm"
+              >
+                <AlertTriangle className="w-4 h-4" /> Logged Late
+              </button>
+              <p className="text-xs text-slate-500 mt-1">Schedule won't be updated.</p>
+            </div>
             <button 
               onClick={() => setShowWaterPopup(false)}
-              className="w-full py-1 text-slate-400 text-xs font-medium"
+              className="w-full py-1 text-slate-400 text-xs font-medium mt-2"
             >
               Cancel
             </button>
