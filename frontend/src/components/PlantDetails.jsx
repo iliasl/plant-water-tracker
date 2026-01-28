@@ -1,25 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { ChevronLeft, Trash2, X as CloseIcon, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Trash2, MoreVertical } from 'lucide-react';
 import HistoryChart from './HistoryChart';
+import ImageModal from './ImageModal';
 import { format, parseISO } from 'date-fns';
 
 const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
   const [plant, setPlant] = useState(initialPlant);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isImageModalOpen, setImageModalOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
   const fetchDetails = async () => {
     try {
+      setLoading(true);
       const [historyRes, plantRes] = await Promise.all([
         axios.get(`/api/plants/${initialPlant.id}/history`),
         axios.get(`/api/plants/${initialPlant.id}`)
       ]);
       setHistory(historyRes.data);
       setPlant(plantRes.data);
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching details', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,7 +36,42 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
     if (confirm('Delete this event? This will recalculate the plant schedule.')) {
       await axios.delete(`/api/events/${eventId}`);
       await fetchDetails();
-      onUpdate(); // Trigger parent refresh to update dashboard stats
+      onUpdate();
+    }
+  };
+
+  const handleImageClick = () => {
+    if (plant.imageUrl) {
+      setImageModalOpen(true);
+    }
+  };
+
+  const handlePencilClick = () => {
+    fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const uploadRes = await axios.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const { imageUrl } = uploadRes.data;
+
+      const updateRes = await axios.patch(`/api/plants/${plant.id}`, { imageUrl });
+      setPlant(updateRes.data);
+      setImageModalOpen(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Error uploading image:', error);
     }
   };
 
@@ -47,7 +87,7 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
     try {
       const res = await axios.patch(`/api/plants/${plant.id}`, { currentEma: newEma });
       setPlant(res.data);
-      onUpdate(); // Refresh dashboard
+      onUpdate();
     } catch (error) {
       console.error('Failed to adjust schedule', error);
     }
@@ -55,12 +95,30 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300">
+       <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="image/*"
+      />
+
+      {isImageModalOpen && (
+        <ImageModal
+          imageUrl={plant.imageUrl}
+          onClose={() => setImageModalOpen(false)}
+          onEdit={handlePencilClick}
+        />
+      )}
       <div className="flex items-center gap-4">
         <button onClick={onBack} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
           <ChevronLeft />
         </button>
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center text-slate-400">
+          <div 
+            className="w-16 h-16 rounded-full overflow-hidden border-2 border-slate-200 shrink-0 bg-slate-100 flex items-center justify-center text-slate-400 cursor-pointer"
+            onClick={handleImageClick}
+          >
             {plant.imageUrl ? (
               <img src={plant.imageUrl} alt={plant.name} className="w-full h-full object-cover" />
             ) : (
