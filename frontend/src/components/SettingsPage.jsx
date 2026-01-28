@@ -1,42 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
+import RoomList from './RoomList';
+import PlantList from './PlantList';
+
+
 
 const SettingsPage = ({ onBack, onOpenGraveyard }) => {
   const [settings, setSettings] = useState({ ema_alpha: 0.35, snooze_factor: 0.2 });
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+
+  const loadSettings = async () => {
+    setLoading(true);
+    const res = await axios.get('/api/dashboard');
+    setRooms(res.data);
+    if (res.data[0]?.user?.settings) {
+      setSettings(res.data[0].user.settings);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const loadSettings = async () => {
-      const res = await axios.get('/api/dashboard'); // Or specific settings endpoint
-      setRooms(res.data);
-      // Assuming first room has the user info for demo
-      if (res.data[0]?.user?.settings) {
-        setSettings(res.data[0].user.settings);
-      }
-      setLoading(false);
-    };
     loadSettings();
   }, []);
 
   const handleSave = async () => {
-    // In a real app, you'd have the user ID from auth
-    const userId = rooms[0].userId; 
+    const userId = rooms[0].userId;
     await axios.patch('/api/user/settings', { userId, settings });
     alert('Settings saved!');
   };
 
   const handleDeleteRoom = async (roomId, roomName) => {
     if (roomName === 'Graveyard') return alert("Cannot delete the Graveyard");
-    
+
     const confirmMsg = `Are you sure you want to delete "${roomName}"? Any plants in this room will be moved to a "Default" room.`;
     if (confirm(confirmMsg)) {
       try {
         await axios.delete(`/api/rooms/${roomId}`);
-        // Refresh rooms list
-        const res = await axios.get('/api/dashboard');
-        setRooms(res.data);
+        await loadSettings();
       } catch (error) {
         console.error('Failed to delete room', error);
         const msg = error.response?.data?.error || 'Failed to delete room';
@@ -45,7 +48,15 @@ const SettingsPage = ({ onBack, onOpenGraveyard }) => {
     }
   };
 
+  const totalPlants = rooms
+    .filter(room => room.name !== 'Graveyard')
+    .reduce((acc, room) => acc + room.plants.length, 0);
+
   if (loading) return <div>Loading...</div>;
+
+  if (selectedRoom) {
+    return <PlantList room={selectedRoom} onBack={() => setSelectedRoom(null)} />;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -101,28 +112,12 @@ const SettingsPage = ({ onBack, onOpenGraveyard }) => {
         </button>
       </section>
 
-      <section className="bg-white p-6 rounded-2xl shadow-sm border">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">Rooms</h3>
-        <div className="space-y-2">
-          {rooms.map(room => (
-            <div key={room.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg group">
-              <div className="flex flex-col">
-                <span className="font-medium">{room.name}</span>
-                <span className="text-xs text-slate-400">{room.plants.length} plants</span>
-              </div>
-              {room.name !== 'Graveyard' && (
-                <button 
-                  onClick={() => handleDeleteRoom(room.id, room.name)}
-                  className="p-2 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                  title="Delete Room"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+      <RoomList
+        rooms={rooms}
+        totalPlants={totalPlants}
+        onRoomClick={setSelectedRoom}
+        onDeleteRoom={handleDeleteRoom}
+      />
 
       <section className="pt-4">
         <button 
