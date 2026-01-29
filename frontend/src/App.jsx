@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Settings as SettingsIcon, Droplets, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, Droplets, Clock, AlertCircle, HelpCircle } from 'lucide-react';
 import RoomSection from './components/RoomSection';
 import PlantCard from './components/PlantCard';
 import PlantModal from './components/PlantModal';
 import SettingsPage from './components/SettingsPage';
 import PlantDetails from './components/PlantDetails';
 import GraveyardPage from './components/GraveyardPage';
+import HelpPage from './components/HelpPage';
 import { Toaster, useToast } from './components/ui/use-toast';
 import { isPast, isToday, parseISO } from 'date-fns';
 
 function App() {
   const [rooms, setRooms] = useState([]);
   const [archetypes, setArchetypes] = useState([]);
-  const [view, setView] = useState('dashboard'); // dashboard, settings, details, graveyard
+  const [view, setView] = useState('dashboard'); // dashboard, settings, details, graveyard, help
   const [selectedPlant, setSelectedPlant] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlant, setEditingPlant] = useState(null);
@@ -105,6 +106,9 @@ function App() {
           </button>
           <button onClick={() => navigateTo('settings')} className={view === 'settings' ? 'text-green-700' : 'text-slate-500'}>
             <SettingsIcon className="w-6 h-6" />
+          </button>
+          <button onClick={() => navigateTo('help')} className={view === 'help' ? 'text-green-700' : 'text-slate-500'}>
+            <HelpCircle className="w-6 h-6" />
           </button>
         </div>
       </header>
@@ -200,6 +204,10 @@ function App() {
             rooms={rooms} 
             onRestore={fetchData}
           />
+        )}
+
+        {view === 'help' && (
+          <HelpPage onBack={() => navigateTo('dashboard')} />
         )}
       </main>
 
