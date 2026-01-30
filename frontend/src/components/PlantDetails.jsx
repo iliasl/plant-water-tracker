@@ -1,28 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
+import api from '../lib/api';
 import { ChevronLeft, Trash2, MoreVertical } from 'lucide-react';
 import HistoryChart from './HistoryChart';
 import ImageModal from './ImageModal';
 import { format, parseISO } from 'date-fns';
 
-const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
-  const [plant, setPlant] = useState(initialPlant);
+const PlantDetails = ({ onUpdate, onEdit }) => {
+  const [plant, setPlant] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isImageModalOpen, setImageModalOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const navigate = useNavigate();
+  const { id } = useParams();
 
   const fetchDetails = async () => {
     try {
       setLoading(true);
       const [historyRes, plantRes] = await Promise.all([
-        axios.get(`/api/plants/${initialPlant.id}/history`),
-        axios.get(`/api/plants/${initialPlant.id}`)
+        api.get(`/plants/${id}/history`),
+        api.get(`/plants/${id}`)
       ]);
       setHistory(historyRes.data);
       setPlant(plantRes.data);
     } catch (error) {
       console.error('Error fetching details', error);
+      if (error.response?.status === 404) {
+        navigate('/'); // Redirect if plant not found
+      }
     } finally {
       setLoading(false);
     }
@@ -30,22 +36,22 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
 
   useEffect(() => {
     fetchDetails();
-  }, [initialPlant.id]);
+  }, [id]);
 
   const handleDeleteEvent = async (eventId) => {
     if (confirm('Delete this event? This will recalculate the plant schedule.')) {
-      await axios.delete(`/api/events/${eventId}`);
+      await api.delete(`/events/${eventId}`);
       await fetchDetails();
       onUpdate();
     }
   };
 
   const handleImageClick = () => {
-    if (plant.imageUrl) {
+    if (plant?.imageUrl) {
       setImageModalOpen(true);
     }
   };
-
+  
   const handlePencilClick = () => {
     fileInputRef.current.click();
   };
@@ -58,7 +64,7 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
     formData.append('image', file);
 
     try {
-      const uploadRes = await axios.post('/api/upload', formData, {
+      const uploadRes = await api.post('/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -66,7 +72,7 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
 
       const { imageUrl } = uploadRes.data;
 
-      const updateRes = await axios.patch(`/api/plants/${plant.id}`, { imageUrl });
+      const updateRes = await api.patch(`/plants/${plant.id}`, { imageUrl });
       setPlant(updateRes.data);
       setImageModalOpen(false);
       onUpdate();
@@ -75,7 +81,7 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading details...</div>;
+  if (loading || !plant) return <div className="p-8 text-center text-slate-500">Loading details...</div>;
 
   const lastWateredDate = plant.lastWateredDate ? parseISO(plant.lastWateredDate) : null;
   const lastWateredDays = lastWateredDate && !isNaN(lastWateredDate)
@@ -85,7 +91,7 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
   const adjustEma = async (amount) => {
     const newEma = Math.max(1, (plant.currentEma || 0) + amount);
     try {
-      const res = await axios.patch(`/api/plants/${plant.id}`, { currentEma: newEma });
+      const res = await api.patch(`/plants/${plant.id}`, { currentEma: newEma });
       setPlant(res.data);
       onUpdate();
     } catch (error) {
@@ -111,7 +117,7 @@ const PlantDetails = ({ plant: initialPlant, onBack, onUpdate, onEdit }) => {
         />
       )}
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
+        <button onClick={() => navigate('/')} className="p-2 -ml-2 hover:bg-slate-100 rounded-full transition-colors">
           <ChevronLeft />
         </button>
         <div className="flex items-center gap-4">

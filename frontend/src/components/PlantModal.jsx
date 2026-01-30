@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../lib/api';
 import { X, Trash2, RotateCcw, AlertTriangle, Camera, Upload } from 'lucide-react';
 
 const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
@@ -21,6 +21,7 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
   // Sync state if props load after mounting
   useEffect(() => {
     if (!roomId && rooms.length > 0) setRoomId(rooms[0].id);
+    if (rooms.length === 0) setShowNewRoom(true);
   }, [rooms, roomId]);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
     setUploading(true);
 
     try {
-      const res = await axios.post('/api/upload', formData, {
+      const res = await api.post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setImageUrl(res.data.imageUrl);
@@ -56,9 +57,12 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
     }
     try {
       let finalRoomId = roomId;
-      if (showNewRoom && newRoomName) {
-        // userId is now handled by the backend if missing
-        const roomRes = await axios.post('/api/rooms', { name: newRoomName }); 
+      if (showNewRoom) {
+        if (!newRoomName) {
+          alert("Please enter a name for the new room.");
+          return;
+        }
+        const roomRes = await api.post('/rooms', { name: newRoomName }); 
         finalRoomId = roomRes.data.id;
       }
 
@@ -81,9 +85,9 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
       }
 
       if (plant) {
-        await axios.patch(`/api/plants/${plant.id}`, payload);
+        await api.patch(`/plants/${plant.id}`, payload);
       } else {
-        await axios.post('/api/plants', payload);
+        await api.post('/plants', payload);
       }
       onSave();
       onClose();
@@ -96,7 +100,7 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
   const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this plant? It will be moved to the Graveyard.')) {
       try {
-        await axios.delete(`/api/plants/${plant.id}`);
+        await api.delete(`/plants/${plant.id}`);
         onSave();
         onClose();
       } catch (error) {
@@ -107,7 +111,7 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
 
   const handleRepot = async () => {
     if (confirm('Are you sure? This will reset the learning history for this plant.')) {
-      await axios.post(`/api/plants/${plant.id}/event`, { type: 'REPOT' });
+      await api.post(`/plants/${plant.id}/event`, { type: 'REPOT' });
       onSave();
       onClose();
     }
@@ -215,7 +219,17 @@ const PlantModal = ({ plant, archetypes, rooms, onClose, onSave }) => {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Room</label>
-            {!showNewRoom ? (
+            {rooms.length === 0 ? (
+              <input 
+                type="text" 
+                value={newRoomName} 
+                onChange={e => setNewRoomName(e.target.value)} 
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Create a room to place your plant in..."
+                autoFocus
+                required
+              />
+            ) : !showNewRoom ? (
               <div className="flex gap-2">
                 <select 
                   value={roomId} 

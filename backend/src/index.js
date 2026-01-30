@@ -1,10 +1,14 @@
 const express = require('express');
 const cors = require('cors');
-const morgan = require('morgan');
+const morgan = 'morgan';
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -28,8 +32,96 @@ const upload = multer({ storage });
 
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+// --- Auth Routes ---
+
+app.post('/api/signup', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+      },
+    });
+
+    // Create a Graveyard room for the new user
+    await getGraveyardRoom(user.id);
+
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1d' });
+    res.status(201).json({ token });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    console.error('Signup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1d' });
+    res.json({ token });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Auth Middleware ---
+const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) {
+    return res.sendStatus(401);
+  }
+
+  jwt.verify(token, JWT_SECRET, async (err, payload) => {
+    if (err) {
+      return res.sendStatus(403);
+    }
+
+    try {
+      const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+      if (!user) {
+        return res.sendStatus(404);
+      }
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error('Authentication error:', error);
+      res.sendStatus(500);
+    }
+  });
+};
+
 
 // --- Helper Functions ---
 
@@ -116,36 +208,19 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 });
 
 // Rooms
-app.get('/api/rooms', async (req, res) => {
+app.get('/api/rooms', authenticateToken, async (req, res) => {
   const rooms = await prisma.room.findMany({
+    where: { userId: req.user.id },
     include: { plants: { include: { archetype: true } } },
     orderBy: { sortOrder: 'asc' }
   });
   res.json(rooms);
 });
 
-app.post('/api/rooms', async (req, res) => {
-  let { name, userId } = req.body;
-  
-  if (!userId) {
-    const user = await prisma.user.findFirst();
-    if (user) {
-      userId = user.id;
-    } else {
-      // Create a default user if none exists
-      const newUser = await prisma.user.create({
-        data: {
-          email: 'default@example.com',
-          passwordHash: 'default',
-          settings: { ema_alpha: 0.35, snooze_factor: 0.2 }
-        }
-      });
-      userId = newUser.id;
-    }
-  }
-
+app.post('/api/rooms', authenticateToken, async (req, res) => {
+  const { name } = req.body;
   const room = await prisma.room.create({
-    data: { name, userId }
+    data: { name, userId: req.user.id }
   });
   res.json(room);
 });
@@ -157,18 +232,35 @@ app.get('/api/archetypes', async (req, res) => {
 });
 
 // Plants
-app.get('/api/plants/:id', async (req, res) => {
-  const plant = await prisma.plant.findUnique({
-    where: { id: req.params.id },
+app.get('/api/plants/:id', authenticateToken, async (req, res) => {
+  const plant = await prisma.plant.findFirst({
+    where: { 
+      id: req.params.id,
+      room: { userId: req.user.id }
+    },
     include: { room: true, archetype: true, events: { orderBy: { timestamp: 'desc' } } }
   });
+
+  if (!plant) {
+    return res.status(404).json({ error: 'Plant not found' });
+  }
+
   res.json(plant);
 });
 
-app.post('/api/plants', async (req, res) => {
+app.post('/api/plants', authenticateToken, async (req, res) => {
   const { name, roomId, archetypeId, imageUrl, waterAmount } = req.body;
   const archetype = await prisma.plantArchetype.findUnique({ where: { id: archetypeId } });
   
+  // Verify the room belongs to the user
+  const room = await prisma.room.findFirst({
+    where: { id: roomId, userId: req.user.id }
+  });
+
+  if (!room) {
+    return res.status(403).json({ error: 'Room not found or access denied' });
+  }
+
   const plant = await prisma.plant.create({
     data: {
       name,
@@ -183,8 +275,27 @@ app.post('/api/plants', async (req, res) => {
   res.json(plant);
 });
 
-app.patch('/api/plants/:id', async (req, res) => {
+app.patch('/api/plants/:id', authenticateToken, async (req, res) => {
   const { name, roomId, archetypeId, imageUrl, currentEma, waterAmount } = req.body;
+  
+  const plantToUpdate = await prisma.plant.findFirst({
+    where: { id: req.params.id, room: { userId: req.user.id } }
+  });
+
+  if (!plantToUpdate) {
+    return res.status(404).json({ error: 'Plant not found' });
+  }
+
+  // If moving to a new room, verify it belongs to the user
+  if (roomId && roomId !== plantToUpdate.roomId) {
+    const newRoom = await prisma.room.findFirst({
+      where: { id: roomId, userId: req.user.id }
+    });
+    if (!newRoom) {
+      return res.status(403).json({ error: 'Target room not found or access denied' });
+    }
+  }
+
   const data = {};
   if (name !== undefined) data.name = name;
   if (roomId !== undefined) data.roomId = roomId;
@@ -194,11 +305,7 @@ app.patch('/api/plants/:id', async (req, res) => {
   
   if (currentEma !== undefined) {
     data.currentEma = parseFloat(currentEma);
-    
-    // If we manually adjust the EMA, we should also shift the nextCheckDate
-    // based on the new EMA from the last watered date
-    const plant = await prisma.plant.findUnique({ where: { id: req.params.id } });
-    const lastWatered = plant.lastWateredDate ? new Date(plant.lastWateredDate) : new Date(plant.createdAt);
+    const lastWatered = plantToUpdate.lastWateredDate ? new Date(plantToUpdate.lastWateredDate) : new Date(plantToUpdate.createdAt);
     data.nextCheckDate = new Date(lastWatered.getTime() + data.currentEma * 24 * 60 * 60 * 1000);
   }
 
@@ -211,15 +318,17 @@ app.patch('/api/plants/:id', async (req, res) => {
 });
 
 // Soft Delete (Move to Graveyard)
-app.delete('/api/plants/:id', async (req, res) => {
-  const plant = await prisma.plant.findUnique({
-    where: { id: req.params.id },
-    include: { room: true }
+app.delete('/api/plants/:id', authenticateToken, async (req, res) => {
+  const plant = await prisma.plant.findFirst({
+    where: { 
+      id: req.params.id,
+      room: { userId: req.user.id }
+     }
   });
   
   if (!plant) return res.status(404).send();
   
-  const graveyard = await getGraveyardRoom(plant.room.userId);
+  const graveyard = await getGraveyardRoom(req.user.id);
   
   const updatedPlant = await prisma.plant.update({
     where: { id: req.params.id },
@@ -230,8 +339,33 @@ app.delete('/api/plants/:id', async (req, res) => {
 });
 
 // Restore from Graveyard
-app.post('/api/plants/:id/restore', async (req, res) => {
-  const { roomId } = req.body; // User must pick a room to restore to
+app.post('/api/plants/:id/restore', authenticateToken, async (req, res) => {
+  const { roomId } = req.body;
+
+  // Verify plant is in graveyard and belongs to user
+  const plantToRestore = await prisma.plant.findFirst({
+    where: {
+      id: req.params.id,
+      room: {
+        userId: req.user.id,
+        name: 'Graveyard'
+      }
+    }
+  });
+
+  if (!plantToRestore) {
+    return res.status(404).json({ error: 'Plant not found in Graveyard' });
+  }
+
+  // Verify the target room belongs to the user
+  const targetRoom = await prisma.room.findFirst({
+    where: { id: roomId, userId: req.user.id }
+  });
+
+  if (!targetRoom || targetRoom.name === 'Graveyard') {
+    return res.status(400).json({ error: 'Invalid restore location' });
+  }
+  
   const updatedPlant = await prisma.plant.update({
     where: { id: req.params.id },
     data: { roomId }
@@ -240,9 +374,10 @@ app.post('/api/plants/:id/restore', async (req, res) => {
 });
 
 // Dashboard Triage View (Exclude Graveyard)
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', authenticateToken, async (req, res) => {
   const rooms = await prisma.room.findMany({
     where: {
+      userId: req.user.id,
       NOT: { name: 'Graveyard' }
     },
     include: {
@@ -257,12 +392,9 @@ app.get('/api/dashboard', async (req, res) => {
 });
 
 // Get Graveyard Plants
-app.get('/api/graveyard', async (req, res) => {
-  const user = await prisma.user.findFirst();
-  if (!user) return res.json([]);
-  
+app.get('/api/graveyard', authenticateToken, async (req, res) => {
   const graveyard = await prisma.room.findFirst({
-    where: { name: 'Graveyard', userId: user.id },
+    where: { name: 'Graveyard', userId: req.user.id },
     include: { plants: { include: { archetype: true } } }
   });
   
@@ -270,9 +402,17 @@ app.get('/api/graveyard', async (req, res) => {
 });
 
 // Events & Logic
-app.post('/api/plants/:id/event', async (req, res) => {
+app.post('/api/plants/:id/event', authenticateToken, async (req, res) => {
   const { type, isAnomaly, note, snoozeExtraDays, soilCondition } = req.body;
   const plantId = req.params.id;
+
+  const plant = await prisma.plant.findFirst({
+    where: { id: plantId, room: { userId: req.user.id } }
+  });
+
+  if (!plant) {
+    return res.status(404).json({ error: 'Plant not found' });
+  }
 
   await prisma.event.create({
     data: { 
@@ -289,8 +429,14 @@ app.post('/api/plants/:id/event', async (req, res) => {
   res.json({ plant: updatedPlant });
 });
 
-app.delete('/api/events/:id', async (req, res) => {
-  const event = await prisma.event.findUnique({ where: { id: req.params.id } });
+app.delete('/api/events/:id', authenticateToken, async (req, res) => {
+  const event = await prisma.event.findFirst({
+    where: { 
+      id: req.params.id,
+      plant: { room: { userId: req.user.id } }
+    }
+  });
+
   if (!event) return res.status(404).send();
   
   const plantId = event.plantId;
@@ -300,19 +446,61 @@ app.delete('/api/events/:id', async (req, res) => {
   res.json(updatedPlant);
 });
 
+app.get('/api/user', authenticateToken, async (req, res) => {
+  res.json({ email: req.user.email });
+});
+
+app.post('/api/user/change-password', authenticateToken, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const user = req.user;
+
+  if (!oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'Old and new passwords are required' });
+  }
+
+  try {
+    const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Incorrect old password' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Settings Update
-app.patch('/api/user/settings', async (req, res) => {
-  const { userId, settings } = req.body;
+app.patch('/api/user/settings', authenticateToken, async (req, res) => {
+  const { settings } = req.body;
   const updatedUser = await prisma.user.update({
-    where: { id: userId },
+    where: { id: req.user.id },
     data: { settings }
   });
   res.json(updatedUser);
 });
 
 // Room CRUD
-app.patch('/api/rooms/:id', async (req, res) => {
+app.patch('/api/rooms/:id', authenticateToken, async (req, res) => {
   const { name, sortOrder } = req.body;
+
+  const roomToUpdate = await prisma.room.findFirst({
+    where: { id: req.params.id, userId: req.user.id }
+  });
+
+  if (!roomToUpdate) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+
   const room = await prisma.room.update({
     where: { id: req.params.id },
     data: { name, sortOrder }
@@ -320,37 +508,29 @@ app.patch('/api/rooms/:id', async (req, res) => {
   res.json(room);
 });
 
-app.delete('/api/rooms/:id', async (req, res) => {
+app.delete('/api/rooms/:id', authenticateToken, async (req, res) => {
   const roomId = req.params.id;
   
-  const room = await prisma.room.findUnique({
-    where: { id: roomId },
+  const room = await prisma.room.findFirst({
+    where: { id: roomId, userId: req.user.id },
     include: { plants: true }
   });
 
   if (!room) return res.status(404).send();
   if (room.name === 'Graveyard') return res.status(400).json({ error: "Cannot delete the Graveyard" });
-  if (room.name === 'Default' && room.plants.length > 0) {
-    return res.status(400).json({ error: "Cannot delete the Default room while it has plants. Move them to another room first." });
-  }
-
+  
+  // Find or create a Default room to move plants if necessary
   if (room.plants.length > 0) {
-    // Find or create a Default room only if there are plants to move
     let defaultRoom = await prisma.room.findFirst({
-      where: { name: 'Default', userId: room.userId, NOT: { id: roomId } }
+      where: { name: 'Default', userId: req.user.id }
     });
 
     if (!defaultRoom) {
       defaultRoom = await prisma.room.create({
-        data: {
-          name: 'Default',
-          userId: room.userId,
-          sortOrder: 0
-        }
+        data: { name: 'Default', userId: req.user.id, sortOrder: 0 }
       });
     }
 
-    // Move plants to Default room
     await prisma.plant.updateMany({
       where: { roomId: roomId },
       data: { roomId: defaultRoom.id }
@@ -362,7 +542,15 @@ app.delete('/api/rooms/:id', async (req, res) => {
 });
 
 // Plant History
-app.get('/api/plants/:id/history', async (req, res) => {
+app.get('/api/plants/:id/history', authenticateToken, async (req, res) => {
+  const plant = await prisma.plant.findFirst({
+    where: { id: req.params.id, room: { userId: req.user.id } }
+  });
+
+  if (!plant) {
+    return res.status(404).json({ error: 'Plant not found' });
+  }
+
   const events = await prisma.event.findMany({
     where: { plantId: req.params.id },
     orderBy: { timestamp: 'asc' }

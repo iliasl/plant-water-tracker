@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Droplets, Clock, AlertCircle, RotateCcw, Settings, Trash2 } from 'lucide-react';
 
-const HelpPage = ({ onBack }) => {
+const HelpPage = () => {
+  const navigate = useNavigate();
+
   const Section = ({ title, icon, children }) => (
     <section className="space-y-4 bg-white p-6 rounded-2xl shadow-sm border">
       <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
@@ -26,7 +29,7 @@ const HelpPage = ({ onBack }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex items-center gap-4 mb-2">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft /></button>
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2"><ChevronLeft /></button>
         <h1 className="text-2xl font-bold">Help Center</h1>
       </div>
 

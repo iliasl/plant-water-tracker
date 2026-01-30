@@ -1,35 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import api from '../lib/api';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 import RoomList from './RoomList';
 import PlantList from './PlantList';
 
-
-
-const SettingsPage = ({ onBack, onOpenGraveyard }) => {
+const SettingsPage = () => {
   const [settings, setSettings] = useState({ ema_alpha: 0.35, snooze_factor: 0.2 });
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const navigate = useNavigate();
 
-  const loadSettings = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const res = await axios.get('/api/dashboard');
-    setRooms(res.data);
-    if (res.data[0]?.user?.settings) {
-      setSettings(res.data[0].user.settings);
+    try {
+      const [userRes, roomsRes] = await Promise.all([
+        api.get('/user'),
+        api.get('/rooms')
+      ]);
+      setSettings(userRes.data.settings);
+      setRooms(roomsRes.data);
+    } catch (error) {
+      console.error('Failed to load settings data', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    loadSettings();
+    loadData();
   }, []);
 
   const handleSave = async () => {
-    const userId = rooms[0].userId;
-    await axios.patch('/api/user/settings', { userId, settings });
-    alert('Settings saved!');
+    try {
+      await api.patch('/user/settings', { settings });
+      alert('Settings saved!');
+    } catch (error) {
+      console.error('Failed to save settings', error);
+      alert('Failed to save settings');
+    }
   };
 
   const handleDeleteRoom = async (roomId, roomName) => {
@@ -38,8 +48,8 @@ const SettingsPage = ({ onBack, onOpenGraveyard }) => {
     const confirmMsg = `Are you sure you want to delete "${roomName}"? Any plants in this room will be moved to a "Default" room.`;
     if (confirm(confirmMsg)) {
       try {
-        await axios.delete(`/api/rooms/${roomId}`);
-        await loadSettings();
+        await api.delete(`/rooms/${roomId}`);
+        await loadData();
       } catch (error) {
         console.error('Failed to delete room', error);
         const msg = error.response?.data?.error || 'Failed to delete room';
@@ -50,7 +60,7 @@ const SettingsPage = ({ onBack, onOpenGraveyard }) => {
 
   const totalPlants = rooms
     .filter(room => room.name !== 'Graveyard')
-    .reduce((acc, room) => acc + room.plants.length, 0);
+    .reduce((acc, room) => acc + (room.plants ? room.plants.length : 0), 0);
 
   if (loading) return <div>Loading...</div>;
 
@@ -61,7 +71,7 @@ const SettingsPage = ({ onBack, onOpenGraveyard }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       <div className="flex items-center gap-4 mb-6">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft /></button>
+        <button onClick={() => navigate('/')} className="p-2 -ml-2"><ChevronLeft /></button>
         <h2 className="text-2xl font-bold">Settings</h2>
       </div>
 
@@ -121,7 +131,7 @@ const SettingsPage = ({ onBack, onOpenGraveyard }) => {
 
       <section className="pt-4">
         <button 
-          onClick={onOpenGraveyard}
+          onClick={() => navigate('/graveyard')}
           className="w-full flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 font-medium py-3 border-2 border-dashed border-slate-200 rounded-xl transition-colors"
         >
           <Trash2 className="w-5 h-5" /> View Plant Graveyard

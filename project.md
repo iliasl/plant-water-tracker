@@ -49,5 +49,5 @@ The app is designed to run in a Docker environment (specifically optimized for P
 To sync changes from development to production:
 ```bash
 rsync -avz --exclude 'node_modules' --exclude '.git' ~/plant_tracker_project root@192.168.10.205:/root/
-ssh root@<IP> 'cd ~/plant_tracker_project && docker compose up --build -d'
+ssh root@192.168.10.205 'cd ~/plant_tracker_project && docker compose up --build -d'
 ```

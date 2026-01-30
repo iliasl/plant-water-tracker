@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import api from '../lib/api';
 import { ChevronLeft, RefreshCw, Trash2, Heart } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const GraveyardPage = ({ onBack, rooms, onRestore }) => {
+const GraveyardPage = ({ rooms, onRestore }) => {
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restoringId, setRestoringId] = useState(null);
+  const navigate = useNavigate();
 
   const fetchGraveyard = async () => {
     try {
-      const res = await axios.get('/api/graveyard');
+      const res = await api.get('/graveyard');
       setPlants(res.data);
-      setLoading(false);
     } catch (error) {
       console.error('Failed to fetch graveyard', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -23,12 +26,14 @@ const GraveyardPage = ({ onBack, rooms, onRestore }) => {
   }, []);
 
   const handleRestore = async (plantId) => {
-    const roomId = rooms[0]?.id; // Simple restoration to first room
+    // TODO: Ask user to which room to restore the plant
+    const availableRooms = rooms.filter(r => r.name !== 'Graveyard');
+    const roomId = availableRooms[0]?.id;
     if (!roomId) return alert("Create a room first!");
     
     setRestoringId(plantId);
     try {
-      await axios.post(`/api/plants/${plantId}/restore`, { roomId });
+      await api.post(`/plants/${plantId}/restore`, { roomId });
       await fetchGraveyard();
       onRestore(); // Refresh dashboard
     } catch (error) {
@@ -43,7 +48,7 @@ const GraveyardPage = ({ onBack, rooms, onRestore }) => {
   return (
     <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 -ml-2"><ChevronLeft /></button>
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2"><ChevronLeft /></button>
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Trash2 className="w-6 h-6 text-slate-400" /> Plant Graveyard
         </h2>
