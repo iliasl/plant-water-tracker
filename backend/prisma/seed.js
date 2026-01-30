@@ -153,7 +153,8 @@ async function recalculatePlantState(plantId) {
 
   if (!plant) return;
 
-  const settings = plant.room.user?.settings || { ema_alpha: 0.35, snooze_factor: 0.2 };
+  const defaults = { ema_alpha: 0.35, snooze_factor: 0.2 };
+  const settings = { ...defaults, ...(plant.room?.user?.settings || {}) };
   const events = plant.events;
 
   let currentEma = plant.archetype.defaultInterval;

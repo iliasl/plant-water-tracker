@@ -6,6 +6,7 @@ import RoomSection from './components/RoomSection';
 import PlantCard from './components/PlantCard';
 import PlantModal from './components/PlantModal';
 import SettingsPage from './components/SettingsPage';
+import { UserSettingsProvider } from './lib/userSettings';
 import PlantDetails from './components/PlantDetails';
 import GraveyardPage from './components/GraveyardPage';
 import HelpPage from './components/HelpPage';
@@ -203,12 +204,14 @@ const MainApp = () => {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/*" element={<PrivateRoute><MainApp /></PrivateRoute>} />
-      </Routes>
-    </Router>
+    <UserSettingsProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/*" element={<PrivateRoute><MainApp /></PrivateRoute>} />
+        </Routes>
+      </Router>
+    </UserSettingsProvider>
   );
 }
 

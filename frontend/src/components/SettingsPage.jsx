@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { useContext } from 'react';
+import { UserSettingsContext } from '../lib/userSettings';
 import { ChevronLeft, Save, Trash2 } from 'lucide-react';
 import RoomList from './RoomList';
 import PlantList from './PlantList';
 
 const SettingsPage = () => {
-  const [settings, setSettings] = useState({ ema_alpha: 0.35, snooze_factor: 0.2 });
+  const { settings: ctxSettings, setSettings: setCtxSettings } = useContext(UserSettingsContext);
+  const [settings, setSettings] = useState(ctxSettings || { ema_alpha: 0.35, snooze_factor: 0.2 });
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -19,7 +22,10 @@ const SettingsPage = () => {
         api.get('/user'),
         api.get('/rooms')
       ]);
-      setSettings(userRes.data.settings);
+      const defaults = { ema_alpha: 0.35, snooze_factor: 0.2 };
+      const merged = userRes.data.settings || defaults;
+      setSettings(merged);
+      setCtxSettings(merged);
       setRooms(roomsRes.data);
     } catch (error) {
       console.error('Failed to load settings data', error);
@@ -35,6 +41,8 @@ const SettingsPage = () => {
   const handleSave = async () => {
     try {
       await api.patch('/user/settings', { settings });
+      // update global context so other components pick up new values immediately
+      setCtxSettings(settings);
       alert('Settings saved!');
     } catch (error) {
       console.error('Failed to save settings', error);

@@ -1,9 +1,10 @@
 // Import necessary dependencies from React and other libraries.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { MoreVertical, Droplets, Clock, AlertCircle, Plus, Minus, AlertTriangle } from 'lucide-react';
 
 // Import utility functions, including one for conditional class naming.
 import { cn } from '../lib/utils';
+import { UserSettingsContext } from '../lib/userSettings';
 import { formatDistanceToNow, isPast, parseISO, isToday } from 'date-fns';
 
 
@@ -32,11 +33,14 @@ const PlantCard = ({ plant, onAction, onEdit, onView }) => {
 
   // This effect calculates the default snooze duration based on the plant's current EMA (Exponential Moving Average).
   // It ensures the snooze period is a fraction of the watering cycle, with a minimum of 2 days.
+  const { settings } = useContext(UserSettingsContext);
+
   useEffect(() => {
+    const factor = settings?.snooze_factor ?? 0.2;
     if (plant.currentEma) {
-      setSnoozeDays(Math.max(2, Math.floor(plant.currentEma * 0.2)));
+      setSnoozeDays(Math.max(2, Math.floor(plant.currentEma * factor)));
     }
-  }, [plant.currentEma]);
+  }, [plant.currentEma, settings]);
 
   // Format the last watered date into a human-readable string.
   const lastWateredStr = plant.lastWateredDate 

@@ -131,7 +131,8 @@ const recalculatePlantState = async (plantId) => {
     include: { room: { include: { user: true } }, events: { orderBy: { timestamp: 'asc' } }, archetype: true }
   });
 
-  const settings = plant.room.user?.settings || { ema_alpha: 0.35, snooze_factor: 0.2 };
+  const defaults = { ema_alpha: 0.35, snooze_factor: 0.2 };
+  const settings = { ...defaults, ...(plant.room?.user?.settings || {}) };
   const events = plant.events;
 
   let currentEma = plant.archetype.defaultInterval;
@@ -447,7 +448,7 @@ app.delete('/api/events/:id', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/user', authenticateToken, async (req, res) => {
-  res.json({ email: req.user.email });
+  res.json({ email: req.user.email, settings: req.user.settings });
 });
 
 app.post('/api/user/change-password', authenticateToken, async (req, res) => {
